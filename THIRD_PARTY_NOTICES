@@ -1,0 +1,38 @@
+BlockTalk is an unofficial independent TeamSpeak 3 protocol client.
+TeamSpeak and Minecraft marks belong to their respective owners. No official logos are used.
+
+BlockTalk's original code is GPL-3.0-or-later; see LICENSE. Included software:
+
+* ts3j, Manevolent, commit db57d60c989e399626aa16d921390f5033e6cdeb.
+  Root license Apache-2.0 (licenses/ts3j-APACHE-2.0.txt).
+  The API/event classes retain their MIT notices, copyright 2014-2015 Bert De Geyter.
+  The bundled QuickLZ Java port, copyright 2006-2011 Lasse Mikkel Reinhold,
+  offers GPL-1.0/2.0/3.0 or a commercial license. This distribution uses GPL-3.0.
+  Punisher.NaCl code is retained under the repository's Apache-2.0 grant.
+  All upstream headers are preserved. BlockTalk modifications are documented in
+  third_party/ts3j/PATCHES.diff and docs/DEPENDENCIES.md.
+
+* Opus 1.6.1, Xiph.Org Foundation, Skype Limited, Jean-Marc Valin,
+  Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding,
+  Erik de Castro Lopo and other contributors.
+  BSD-3-Clause and patent grant: licenses/OPUS-BSD-3-CLAUSE.txt.
+  The source archive is included at third_party/opus/opus-1.6.1.tar.gz.
+  Windows x86_64 DLL compiled from that source using Zig 0.14.1.
+  The small JNA binding and native loader are original BlockTalk code.
+  No opus4j, opus-java wrapper or opus-java prebuilt natives are distributed.
+
+* Bouncy Castle bcprov-jdk18on 1.86, The Legion of the Bouncy Castle Inc.
+  Bouncy Castle MIT-style license: licenses/BOUNCY-CASTLE.html.
+* dnsjava 3.6.3, Brian Wellington and contributors.
+  BSD-3-Clause: licenses/DNSJAVA.txt.
+
+Minecraft supplies JNA 5.14.0 (Apache-2.0 / LGPL-2.1-or-later choice),
+Gson 2.10.1 (Apache-2.0), SLF4J 2.0.9 (MIT) and the game libraries.
+These are not duplicated inside this MOD JAR. Standalone tools resolve the
+same pinned versions from Maven Central; transitive build dependencies are
+recorded in Gradle lockfiles and docs/DEPENDENCIES.md.
+
+The Gradle Wrapper is taken from the official NeoForge 1.21.1 MDK at
+f7002b1b6011723c7b12fde95147689491a6ddab, and uses Gradle 9.2.1 (Apache-2.0).
+The Gradle distribution is checksum-verified. The NeoForge MDK template
+license is reproduced at licenses/MDK-TEMPLATE.txt.

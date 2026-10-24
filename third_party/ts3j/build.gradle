@@ -1,0 +1,14 @@
+plugins { id 'java-library' }
+group = 'dev.blocktalk.vendor'
+version = '1.0.3-blocktalk.1'
+java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
+repositories { mavenCentral() }
+dependencies {
+    api 'org.bouncycastle:bcprov-jdk18on:1.86'
+    implementation 'dnsjava:dnsjava:3.6.3'
+    testImplementation 'junit:junit:4.13.2'
+}
+test { exclude '**/TS3DNSTest.class' }
+tasks.register('externalTest', Test) { include '**/TS3DNSTest.class'; testClassesDirs=sourceSets.test.output.classesDirs; classpath=sourceSets.test.runtimeClasspath }
+sourceSets.main.java.exclude 'Punisher/NaCl/Test_Ed25519.java'
+tasks.named('jar') { from('LICENSE') { rename { 'META-INF/licenses/ts3j-APACHE-2.0' } } }

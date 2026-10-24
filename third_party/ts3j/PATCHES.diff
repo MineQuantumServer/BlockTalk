@@ -1,0 +1,270 @@
+--- a/src/main/java/com/github/manevolent/ts3j/command/response/AbstractCommandResponse.java
++++ b/src/main/java/com/github/manevolent/ts3j/command/response/AbstractCommandResponse.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.command.response;
+ 
+ import com.github.manevolent.ts3j.command.CommandException;
+@@ -25,7 +26,9 @@
+     @Override
+     public void complete() throws InterruptedException, CommandException {
+         try {
+-            future.get();
++            future.get(10, TimeUnit.SECONDS);
++        } catch (java.util.concurrent.TimeoutException ex) {
++            throw new CommandException("command timed out", -1); // BlockTalk
+         } catch (ExecutionException ex) {
+             if (ex.getCause() != null && ex.getCause() instanceof CommandException)
+                 throw (CommandException) ex.getCause();
+@@ -39,6 +42,8 @@
+             throws TimeoutException, InterruptedException, CommandException {
+         try {
+             return map(future.get(timeoutMillis, TimeUnit.MILLISECONDS));
++        } catch (java.util.concurrent.TimeoutException ex) {
++            throw new CommandException("command timed out", -1); // BlockTalk
+         } catch (ExecutionException ex) {
+             if (ex.getCause() != null && ex.getCause() instanceof CommandException)
+                 throw (CommandException) ex.getCause();
+@@ -50,7 +55,9 @@
+     @Override
+     public T get() throws InterruptedException, CommandException {
+         try {
+-            return map(future.get());
++            return map(future.get(10, TimeUnit.SECONDS));
++        } catch (java.util.concurrent.TimeoutException ex) {
++            throw new CommandException("command timed out", -1); // BlockTalk
+         } catch (ExecutionException ex) {
+             if (ex.getCause() != null && ex.getCause() instanceof CommandException)
+                 throw (CommandException) ex.getCause();
+--- a/src/main/java/com/github/manevolent/ts3j/identity/LocalIdentity.java
++++ b/src/main/java/com/github/manevolent/ts3j/identity/LocalIdentity.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.identity;
+ 
+ import com.github.manevolent.ts3j.util.Ts3Crypt;
+@@ -12,7 +13,6 @@
+ import org.bouncycastle.jce.ECNamedCurveTable;
+ import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
+ import org.bouncycastle.math.ec.ECPoint;
+-import org.ini4j.Ini;
+ 
+ import java.io.*;
+ import java.math.BigInteger;
+@@ -255,9 +255,21 @@
+      * @return local identity
+      */
+     public static final LocalIdentity read(InputStream inputStream) throws IOException {
+-        Ini ini = new Ini(inputStream);
+-
+-        String identityValue = ini.get("Identity", "identity");
++        // BlockTalk: parse only the bounded identity field, without INI interpolation.
++        // This removes ini4j and its recursive property-resolution DoS surface.
++        byte[] contents = inputStream.readNBytes(16385);
++        if (contents.length > 16384) throw new IOException("identity INI too large");
++        String identityValue = null;
++        boolean inIdentity = false;
++        for (String raw : new String(contents, java.nio.charset.StandardCharsets.UTF_8).split("\\R")) {
++            String line = raw.trim();
++            if (line.startsWith("[")) { inIdentity = line.equals("[Identity]"); continue; }
++            int equals = line.indexOf('=');
++            if (inIdentity && equals > 0 && line.substring(0, equals).trim().equals("identity")) {
++                identityValue = line.substring(equals + 1).trim();
++                break;
++            }
++        }
+         if (identityValue == null)
+             throw new IOException(new IllegalArgumentException("missing identity value"));
+ 
+--- a/src/main/java/com/github/manevolent/ts3j/protocol/packet/handler/client/LocalClientHandlerConnecting.java
++++ b/src/main/java/com/github/manevolent/ts3j/protocol/packet/handler/client/LocalClientHandlerConnecting.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.protocol.packet.handler.client;
+ 
+ import com.github.manevolent.ts3j.command.Command;
+@@ -128,7 +129,7 @@
+                     try {
+                         Thread.sleep(1000L);
+                     } catch (InterruptedException e) {
+-                        e.printStackTrace();
++                        getClient().getExceptionHandler().accept(e); // BlockTalk: no raw diagnostics
+                     }
+                     onAssigned();
+                     return;
+@@ -146,6 +147,8 @@
+                 byte[] alpha = Base64.getDecoder().decode(command.get("alpha").getValue()); // alpha
+                 byte[] beta = Base64.getDecoder().decode(command.get("beta").getValue()); // beta
+                 byte[] omega = Base64.getDecoder().decode(command.get("omega").getValue()); // omega
++                // BlockTalk: stable server-key fingerprint fallback when initserver omits UID.
++                getClient().setOption("blocktalk.server_fingerprint", Base64.getEncoder().encodeToString(Ts3Crypt.hash256(omega)));
+ 
+                 getClient().setSecureParameters(Ts3Crypt.cryptoInit(alpha, beta, omega, getClient().getIdentity()));
+ 
+@@ -166,6 +169,8 @@
+ 
+                 byte[] beta = Base64.getDecoder().decode(command.get("beta").getValue()); // beta
+                 byte[] omega = Base64.getDecoder().decode(command.get("omega").getValue()); // omega
++                // BlockTalk: stable server-key fingerprint; never contains the client's private key.
++                getClient().setOption("blocktalk.server_fingerprint", Base64.getEncoder().encodeToString(Ts3Crypt.hash256(omega)));
+                 byte[] proof = Base64.getDecoder().decode(command.get("proof").getValue());
+ 
+                 Pair<byte[], byte[]> keyPair = Ts3Crypt.generateKeypair();
+--- a/src/main/java/com/github/manevolent/ts3j/protocol/packet/handler/client/LocalClientHandlerRetrievingData.java
++++ b/src/main/java/com/github/manevolent/ts3j/protocol/packet/handler/client/LocalClientHandlerRetrievingData.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.protocol.packet.handler.client;
+ 
+ import com.github.manevolent.ts3j.command.CommandProcessException;
+@@ -15,6 +16,9 @@
+     @Override
+     protected void handleCommand(MultiCommand command) throws CommandProcessException {
+         if (command.getName().equalsIgnoreCase("error")) {
++            // BlockTalk: retain numeric authentication errors without server-supplied text.
++            int code = Integer.parseInt(command.simplifyOne().get("id").getValue());
++            getClient().getExceptionHandler().accept(new com.github.manevolent.ts3j.command.CommandException("authentication failed", code));
+             try {
+                 getClient().setState(ClientConnectionState.DISCONNECTED);
+             } catch (Exception e) {
+--- a/src/main/java/com/github/manevolent/ts3j/protocol/packet/transformation/PacketTransformation.java
++++ b/src/main/java/com/github/manevolent/ts3j/protocol/packet/transformation/PacketTransformation.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.protocol.packet.transformation;
+ 
+ import com.github.manevolent.ts3j.protocol.Packet;
+@@ -20,11 +21,13 @@
+     private final byte[] ivStruct;
+     private final byte[] fakeMac;
+ 
+-    private final EAXBlockCipher cipher;
++    // BlockTalk: do not share cipher state between receive, send and retransmission.
++    // TS3's fixed initial parameters and identical ACK retransmissions are protocol-defined.
++    // A new EAX instance preserves the wire algorithm with BC 1.86's reuse guard.
++    private final Object cipherLock = new Object();
+ 
+     public PacketTransformation(byte[] ivStruct, byte[] fakeMac) {
+         this.ivStruct = ivStruct;
+-        this.cipher = new EAXBlockCipher(new AESEngine());
+         this.fakeMac = fakeMac;
+     }
+ 
+@@ -89,7 +92,8 @@
+         byte[] result;
+         int len;
+ 
+-        synchronized (cipher) {
++        synchronized (cipherLock) {
++            EAXBlockCipher cipher = new EAXBlockCipher(new AESEngine());
+             cipher.init(true, cipherParameters);
+ 
+             result = new byte[cipher.getOutputSize(dataLen)];
+@@ -137,7 +141,8 @@
+         byte[] result;
+         int len;
+ 
+-        synchronized (cipher) {
++        synchronized (cipherLock) {
++            EAXBlockCipher cipher = new EAXBlockCipher(new AESEngine());
+             cipher.init(false, cipherParameters);
+             result = new byte[cipher.getOutputSize(dataLen + MAC_LEN)];
+ 
+--- a/src/main/java/com/github/manevolent/ts3j/protocol/socket/client/AbstractTeamspeakClientSocket.java
++++ b/src/main/java/com/github/manevolent/ts3j/protocol/socket/client/AbstractTeamspeakClientSocket.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.protocol.socket.client;
+ 
+ import com.github.manevolent.ts3j.command.*;
+@@ -24,7 +25,6 @@
+ import com.github.manevolent.ts3j.util.Ts3Crypt;
+ import com.github.manevolent.ts3j.util.Ts3Debugging;
+ import com.github.manevolent.ts3j.util.Pair;
+-import org.apache.commons.lang.reflect.ConstructorUtils;
+ import org.bouncycastle.crypto.InvalidCipherTextException;
+ 
+ import java.io.EOFException;
+@@ -72,7 +72,7 @@
+     private Consumer<PacketBody0Voice> voiceHandler;
+     private Consumer<PacketBody1VoiceWhisper> whisperHandler;
+ 
+-    private Consumer<Throwable> exceptionHandler = Throwable::printStackTrace;
++    private Consumer<Throwable> exceptionHandler = error -> { } /* BlockTalk: errors reported by sanitized adapter */;
+ 
+     private Identity identity = null;
+     private ClientConnectionState connectionState = null;
+@@ -1466,6 +1466,7 @@
+     }
+ 
+     private PacketHandler createHandler(Class<? extends PacketHandler> clazz) throws ReflectiveOperationException {
+-        return (PacketHandler) ConstructorUtils.invokeConstructor(clazz, this);
++        // BlockTalk: standard reflection removes obsolete commons-lang 2.6 entirely.
++        return clazz.getConstructor(LocalTeamspeakClientSocket.class).newInstance(this);
+     }
+ }
+--- a/src/main/java/com/github/manevolent/ts3j/protocol/socket/client/LocalTeamspeakClientSocket.java
++++ b/src/main/java/com/github/manevolent/ts3j/protocol/socket/client/LocalTeamspeakClientSocket.java
+@@ -1,3 +1,4 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.protocol.socket.client;
+ 
+ import com.github.manevolent.ts3j.api.Ban;
+@@ -55,6 +56,10 @@
+     private List<TS3Listener> listeners = new LinkedList<>();
+ 
+     private Integer serverId = null;
++    // BlockTalk: use the server's stable UID for per-user preferences.
++    private volatile String serverUniqueIdentifier = "";
++    public String getServerUniqueIdentifier() { return serverUniqueIdentifier; }
++    public String getServerFingerprint() { return getOption("blocktalk.server_fingerprint", String.class); }
+ 
+     /**
+      * The internal command buffer
+@@ -361,7 +366,7 @@
+ 
+             // Resolve remote
+             if (remote.isUnresolved())
+-                remote = new InetSocketAddress(remote.getAddress().getHostAddress(), remote.getPort());
++                remote = new InetSocketAddress(remote.getHostString(), remote.getPort());
+ 
+             // Release old socket (if any)
+             if (socket != null && !socket.isClosed())
+@@ -421,8 +426,11 @@
+ 
+     @Override
+     public void close() throws IOException {
+-        socket.close();
+-        commandExecutionService.shutdown();
++        // BlockTalk: close is null-safe, cancels I/O and releases all owned workers.
++        setMicrophone(null);
++        try { setState(ClientConnectionState.DISCONNECTED); } catch (Exception ignored) { }
++        if (socket != null) socket.close();
++        commandExecutionService.shutdownNow();
+     }
+ 
+     @Override
+@@ -780,6 +788,8 @@
+                 LocalTeamspeakClientSocket.super.setNickname(singleCommand.get("acn").getValue());
+ 
+                 serverId = Integer.parseInt(singleCommand.get("virtualserver_id").getValue());
++                if (singleCommand.get("virtualserver_unique_identifier") != null)
++                    serverUniqueIdentifier = singleCommand.get("virtualserver_unique_identifier").getValue();
+             } catch (Exception e) {
+                 throw new CommandProcessException(e);
+             }
+--- a/src/main/java/com/github/manevolent/ts3j/util/Ts3Debugging.java
++++ b/src/main/java/com/github/manevolent/ts3j/util/Ts3Debugging.java
+@@ -1,10 +1,11 @@
++// Modified by BlockTalk; see third_party/ts3j/PATCHES.diff.
+ package com.github.manevolent.ts3j.util;
+ 
+ public final class Ts3Debugging {
+     private static boolean enabled;
+ 
+     public static boolean isEnabled() {
+-        return enabled;
++        return false; // BlockTalk: raw protocol logging disabled
+     }
+ 
+     public static void setEnabled(boolean enabled) {

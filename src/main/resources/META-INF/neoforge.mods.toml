@@ -1,0 +1,22 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="GPL-3.0-or-later"
+[[mods]]
+modId="blocktalk"
+version="0.1.0-alpha.1"
+displayName="BlockTalk"
+description='''Unofficial independent TeamSpeak 3 voice client. Experimental; interoperability validation in progress.'''
+[[mixins]]
+config="blocktalk.mixins.json"
+[[dependencies.blocktalk]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.264,21.2)"
+ordering="NONE"
+side="CLIENT"
+[[dependencies.blocktalk]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="CLIENT"

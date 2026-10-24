@@ -1,0 +1,4 @@
+# Preserve vendored source checksums and native resources on every platform.
+* -text
+gradlew text eol=lf
+gradlew.bat text eol=crlf

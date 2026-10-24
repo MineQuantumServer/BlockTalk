@@ -1,0 +1,10 @@
+plugins { id 'java-library' }
+group = 'dev.blocktalk.vendor'
+version = '1.6.1-blocktalk.1'
+java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
+repositories { mavenCentral() }
+dependencies { api 'net.java.dev.jna:jna:5.14.0' }
+tasks.named('jar') {
+    manifest { attributes('Automatic-Module-Name':'dev.blocktalk.opus') }
+    from(rootProject.file('licenses/OPUS-BSD-3-CLAUSE.txt')) { into 'META-INF/licenses' }
+}

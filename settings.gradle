@@ -1,0 +1,3 @@
+pluginManagement { repositories { gradlePluginPortal(); maven { url = 'https://maven.neoforged.net/releases' } } }
+rootProject.name = 'blocktalk'
+include 'third_party:ts3j', 'third_party:opus', 'core'

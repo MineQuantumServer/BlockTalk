@@ -1,0 +1,46 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+group = 'dev.blocktalk'
+version = '0.1.0-alpha.1'
+base { archivesName = 'blocktalk' }
+java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
+evaluationDependsOn(':core')
+evaluationDependsOn(':third_party:ts3j')
+evaluationDependsOn(':third_party:opus')
+repositories { mavenCentral() }
+// A repository must not be disabled by unrelated transient mirror failures.
+repositories.configureEach { if (name == 'NeoForged Releases') content { excludeGroup 'org.slf4j' } }
+neoForge {
+    version = '21.1.264'
+    runs {
+        client { client() }
+        smokeClient { client(); systemProperty 'blocktalk.smoke','true' }
+        server { server(); programArgument '--nogui' }
+    }
+    mods { blocktalk {
+        sourceSet(sourceSets.main)
+        sourceSet(project(':core').sourceSets.main)
+        sourceSet(project(':third_party:ts3j').sourceSets.main)
+        sourceSet(project(':third_party:opus').sourceSets.main)
+    } }
+}
+dependencies {
+    implementation project(':core')
+    jarJar project(':core')
+    jarJar project(':third_party:ts3j')
+    jarJar('org.bouncycastle:bcprov-jdk18on:1.86') { version { strictly '1.86' } }
+    jarJar('dnsjava:dnsjava:3.6.3') { version { strictly '3.6.3' } }
+    jarJar project(':third_party:opus')
+    // Minecraft 1.21.1 supplies Gson, SLF4J and JNA; do not package second copies.
+}
+allprojects {
+    tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+    dependencyLocking { lockAllConfigurations() }
+}
+tasks.register('integration') { dependsOn ':core:integration' }
+tasks.register('nativeSmoke') { dependsOn ':core:nativeSmoke' }
+tasks.named('test') { dependsOn ':core:test' }
+tasks.named('runServer', JavaExec) { standardInput = System.in }
+tasks.named('jar') { from('LICENSE','THIRD_PARTY_NOTICES'); from('licenses') { into 'META-INF/licenses' } }
